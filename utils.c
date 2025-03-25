@@ -180,7 +180,7 @@ build_response (char *uri, char *version, char **contents)
   	
 	char* buff = NULL;
 	int n = snprintf (buff, 0, "%s%s%ld\r\n%s", version, headers, filesize, connection);
-	buff = malloc (n);
+	buff = malloc (n+1);
 	snprintf (buff, n, "%s%s%ld\r\n%s", version, headers, filesize, connection);
   // TODO: Reallocate the header pointer to append the file's size (as a
   // content-length string) and the CRLF characters. Use the realloc-strncat
