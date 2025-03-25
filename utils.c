@@ -32,6 +32,10 @@ setup_server (const char *protocol)
   // server. The hints struct is used by getaddrinfo() to determine if the
   // current system can be configured as a server for the requested protocol.
 
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+
   if (getaddrinfo (NULL, protocol, &hints, &server_list) != 0)
     return -1;
 
@@ -51,8 +55,23 @@ setup_server (const char *protocol)
       // bind is successful, you should break out of this for-loop. Otherwise,
       // shutdown and close the socket and set socketfd back to -1; the loop
       // will continue, trying with the next addrinfo entry.
+      
       int socket_option = -1;
+      setsockopt (socketfd, SOL_SOCKET, SO_REUSEADDR, (const void *) &socket_option, sizeof (int));
+      
       struct timeval timeout = { 10, 0 }; // 10.0 seconds
+      setsockopt (socketfd, SOL_SOCKET, SO_RCVTIMEO, (const void *) &timeout, sizeof (timeout));
+      
+      if (bind (socketfd, server->ai_addr, server->ai_addrlen) == 0) //check server->ai_addr is right if not working
+      	{
+      		break;
+      	}
+    	else
+    		{
+    			close (socketfd);
+    			socketfd = -1;
+    		}
+      
     }
 
   // TODO: Free the server list and convert the socket to a server socket.
@@ -60,6 +79,13 @@ setup_server (const char *protocol)
   // (socketfd == -1). Either way, we do not need the list of addrinfo
   // structs any more, so free them using freeaddrinfo(). If we do have
   // a socket, use listen() to convert it to a server socket.
+  
+  freeaddrinfo (server_list);
+  
+  if (socketfd > 0)
+  	{
+  		listen (socketfd, 50);
+  	}
 
   return socketfd;
 }
@@ -84,7 +110,15 @@ get_connection (int socketfd, int *connection)
   // TODO: Accept the connection request and return the specified values
   // described above.
   
-  return "";
+  *connection = accept (socketfd, &address, &addresslen);
+ 
+  if (*connection < 0)
+  	{
+  		close (socketfd);
+  		return NULL;
+  	}
+ 
+  return inet_ntoa(address.sin_addr);
 }
 
 /* Build the HTTP response for the requested URI and HTTP version. Don't
@@ -121,7 +155,7 @@ build_response (char *uri, char *version, char **contents)
 
   // TODO: For FULL requirements, don't close the file this soon, as you
   // will need to read in the file contents.
-  close (fd);
+  //close (fd);
 
   // TODO: Build the header by resizing and concatenating the strings as
   // needed. See the sample code on the assignment description.
@@ -131,13 +165,23 @@ build_response (char *uri, char *version, char **contents)
   char *headers = " 200 OK\r\n"
     "Content-Type: text/html; charset=UTF-8\r\n"
     "Content-Length: ";
+  
+
   // Create a 21-character buffer to store the file size as a string (use
   // snprintf() to convert the size_t into a char*). We can safely assume the
   // string version while fit, as size_t is a 64-bit value that has a maximum
   // value of 18,446,744,073,709,551,615.
   char size_as_string[21];
   memset (size_as_string, 0, 21);
-
+  
+  char* connection = "\r\n";  
+	if (strcmp(version, "HTTP/1.1") == 0)
+  	connection = "Connection: close\r\n\r\n";
+  	
+	char* buff = NULL;
+	int n = snprintf (buff, 0, "%s%s%ld\r\n%s", version, headers, filesize, connection);
+	buff = malloc (n);
+	snprintf (buff, n, "%s%s%ld\r\n%s", version, headers, filesize, connection);
   // TODO: Reallocate the header pointer to append the file's size (as a
   // content-length string) and the CRLF characters. Use the realloc-strncat
   // model shown above. For FULL requirements, also append the
@@ -145,9 +189,12 @@ build_response (char *uri, char *version, char **contents)
 
   // TODO: For FULL requirements, replace this string with the contents
   // read in from the file:
-  *contents = "<html>\n  <head>\n    <title>Success!</title>\n"
-    "  </head>\n\n  <body>\n    <h2>It <i>really</i> "
-    "works!</h2>\n  </body>\n</html>\n";
   
-  return NULL;
+  /**contents = "<html>\n  <head>\n    <title>Success!</title>\n"
+    "  </head>\n\n  <body>\n    <h2>It <i>really</i> "
+    "works!</h2>\n  </body>\n</html>\n";*/
+  
+  read (fd, *contents, filesize);
+  
+  return buff;
 }
