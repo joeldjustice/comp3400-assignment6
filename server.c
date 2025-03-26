@@ -38,6 +38,15 @@ serve_web (char *protocol)
   // and return NULL.
   char buffer[BUFFER_SIZE];
   memset (&buffer, 0, BUFFER_SIZE);
+  
+  ssize_t bytes_read = read (socketfd, buffer, BUFFER_SIZE);
+  
+  if (bytes_read == -1)
+    {
+      close (socketfd);
+      close (connection);
+      return NULL;
+    }
 
 
   // TODO: Look at the first line of the request to get the URI and the
@@ -52,6 +61,11 @@ serve_web (char *protocol)
   // with "\r", as you want to split the buffer at the carriage return.
   char *version = "HTTP/1.0";
   char *uri = "/index.html";
+  
+  strtok (buffer, " "); // Ignores GET
+  uri = strtok(NULL, " ");
+  version = strtok(NULL, "\r");
+  
 
   printf ("GET Request for %s using %s\n", uri, version);
 
@@ -70,10 +84,37 @@ serve_web (char *protocol)
   // for FULL):
   //      "HTTP/1.0 404 Not Found\r\n\r\n";
   //      "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n";
+  
+  ssize_t bytes;
+  
+  char buf[BUFFER_SIZE];
+  size_t num = sprintf (buf, "%s\r\n\r\n%s\n", header, contents);
+  
+  if (header != NULL)
+    {
+      bytes = write (socketfd, buf, num);
+    }
+  else
+    {
+      if (strcmp(version, "HTTP/1.0"))
+        {
+          bytes = write (socketfd, "HTTP/1.0 404 Not Found\r\n\r\n", strlen("HTTP/1.0 404 Not Found\r\n\r\n"));
+        }
+      else if (strcmp(version, "HTTP/1.1"))
+        {
+          bytes = write (socketfd, "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n"));
+        }
+    }
 
   // TODO: Free the headers and contents, shutdown and close both
   // sockets, return the URI of the request (possibly modified to
   // include "index.html", but not including the srv_root).
+  
+  free (header);
+  free (contents);
+  close (socketfd);
+  close (connection);
+  
   
   return NULL;
 }
