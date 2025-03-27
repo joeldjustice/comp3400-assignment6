@@ -39,7 +39,7 @@ serve_web (char *protocol)
   char buffer[BUFFER_SIZE];
   memset (&buffer, 0, BUFFER_SIZE);
   
-  ssize_t bytes_read = read (socketfd, buffer, BUFFER_SIZE);
+  ssize_t bytes_read = read (connection, buffer, BUFFER_SIZE);
   
   if (bytes_read == -1)
     {
@@ -59,14 +59,19 @@ serve_web (char *protocol)
   // pointer to "GET". Then, calling it as strtok (NULL, " "); would return
   // a pointer to the URI. For the third call, replace the second argument
   // with "\r", as you want to split the buffer at the carriage return.
-  char *version = "HTTP/1.0";
-  char *uri = "/index.html";
+  char *version;
+  char *uri = malloc(1024);
   
   strtok (buffer, " "); // Ignores GET
   uri = strtok(NULL, " ");
+  
   version = strtok(NULL, "\r");
   
-
+	if (strcmp (uri, "/") == 0)
+  	{
+  		uri = "/index.html";
+  	}
+	
   printf ("GET Request for %s using %s\n", uri, version);
 
   // Prepend "srv_root" to the beginnging of the URI to get the full
@@ -88,33 +93,33 @@ serve_web (char *protocol)
   ssize_t bytes;
   
   char buf[BUFFER_SIZE];
-  size_t num = sprintf (buf, "%s\r\n\r\n%s\n", header, contents);
+  size_t num = sprintf (buf, "%s%s", header, contents);
+  //buf[num] = "\n";
   
   if (header != NULL)
     {
-      bytes = write (socketfd, buf, num);
+      bytes = write (connection, buf, num);
     }
   else
     {
-      if (strcmp(version, "HTTP/1.0"))
+      if (strcmp(version, "HTTP/1.0") == 0)
         {
-          bytes = write (socketfd, "HTTP/1.0 404 Not Found\r\n\r\n", strlen("HTTP/1.0 404 Not Found\r\n\r\n"));
+          bytes = write (connection, "HTTP/1.0 404 Not Found\r\n\r\n", strlen("HTTP/1.0 404 Not Found\r\n\r\n"));
         }
-      else if (strcmp(version, "HTTP/1.1"))
+      else if (strcmp(version, "HTTP/1.1") == 0)
         {
-          bytes = write (socketfd, "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n"));
+          bytes = write (connection, "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n", strlen("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n"));
         }
     }
 
   // TODO: Free the headers and contents, shutdown and close both
   // sockets, return the URI of the request (possibly modified to
   // include "index.html", but not including the srv_root).
-  
   free (header);
   free (contents);
   close (socketfd);
   close (connection);
   
   
-  return NULL;
+  return uri;
 }

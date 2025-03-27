@@ -50,7 +50,7 @@ main (int argc, char **argv)
   if (uri_req != NULL)
     {
       printf ("URI requested was: %s\n", uri_req);
-      free (uri_req);
+      //free (uri_req);
     }
 
   return EXIT_SUCCESS;

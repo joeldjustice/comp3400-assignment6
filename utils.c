@@ -149,6 +149,7 @@ build_response (char *uri, char *version, char **contents)
   if (fstat (fd, &file_info) < 0)
     {
       close (fd);
+      *contents = "fd closed";
       return NULL;
     }
   size_t filesize = file_info.st_size;
@@ -161,7 +162,6 @@ build_response (char *uri, char *version, char **contents)
   // needed. See the sample code on the assignment description.
   char *header = strdup (version);
   assert (header != NULL);
-  size_t headerlen = strlen (header);
   char *headers = " 200 OK\r\n"
     "Content-Type: text/html; charset=UTF-8\r\n"
     "Content-Length: ";
@@ -171,6 +171,10 @@ build_response (char *uri, char *version, char **contents)
   // snprintf() to convert the size_t into a char*). We can safely assume the
   // string version while fit, as size_t is a 64-bit value that has a maximum
   // value of 18,446,744,073,709,551,615.
+  // TODO: Reallocate the header pointer to append the file's size (as a
+  // content-length string) and the CRLF characters. Use the realloc-strncat
+  // model shown above. For FULL requirements, also append the
+  // "Connection: close\r\n" for HTTP/1.1 requests and the file contents.
   char size_as_string[21];
   memset (size_as_string, 0, 21);
   
@@ -181,11 +185,7 @@ build_response (char *uri, char *version, char **contents)
 	char* buff = NULL;
 	int n = snprintf (buff, 0, "%s%s%ld\r\n%s", version, headers, filesize, connection);
 	buff = malloc (n+1);
-	snprintf (buff, n, "%s%s%ld\r\n%s", version, headers, filesize, connection);
-  // TODO: Reallocate the header pointer to append the file's size (as a
-  // content-length string) and the CRLF characters. Use the realloc-strncat
-  // model shown above. For FULL requirements, also append the
-  // "Connection: close\r\n" for HTTP/1.1 requests and the file contents.
+	snprintf (buff, n+1, "%s%s%ld\r\n%s", version, headers, filesize, connection);
 
   // TODO: For FULL requirements, replace this string with the contents
   // read in from the file:
@@ -193,8 +193,10 @@ build_response (char *uri, char *version, char **contents)
   /**contents = "<html>\n  <head>\n    <title>Success!</title>\n"
     "  </head>\n\n  <body>\n    <h2>It <i>really</i> "
     "works!</h2>\n  </body>\n</html>\n";*/
-  
-  read (fd, *contents, filesize);
+  *contents = malloc (filesize);
+  memset (*contents, 0, filesize);
+  int bytes = read (fd, *contents, filesize);
+ 
   
   return buff;
 }
